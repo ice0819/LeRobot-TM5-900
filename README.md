@@ -2,6 +2,9 @@
 
 將 Techman Robot TM5-900 整合至 Hugging Face LeRobot，完成雙相機模仿學習的資料收集、ACT policy 訓練與真機推論。
 
+> [!IMPORTANT]
+> 由於完整專案包含的檔案與實驗資源過大，無法直接上傳至 GitHub。**本 GitHub repository 僅作為安裝與使用教學，不提供可直接安裝的完整程式碼。** 請務必從下方提供的 OneDrive 連結下載完整專案，再依本文件操作；只下載本 GitHub 教學內容無法執行 TM5-900。
+
 本專案以 LeRobot `0.4.4` 為基礎，新增：
 
 - TM5-900 的 LeRobot robot adapter（`tm_follower`）
@@ -120,14 +123,38 @@ lerobot/
 
 ### 1. 取得專案
 
-可從 [專案資料夾（OneDrive）](https://1drv.ms/u/c/94a944e4d17daff3/IQCnDA7EtmeAQaBqknIYeAb5AWwwsaFXQ6XNVmlwNqq4Uak?e=KosrZV) 下載並解壓縮，或使用本 GitHub repository：
+完整專案只能從 [LeRobot-TM5-900 專案資料夾（OneDrive）](https://1drv.ms/u/c/94a944e4d17daff3/IQCnDA7EtmeAQaBqknIYeAb5AWwwsaFXQ6XNVmlwNqq4Uak?e=KosrZV) 下載。請在瀏覽器中開啟連結，選擇「下載」，並等待檔案完整下載。
+
+以下假設下載的壓縮檔名稱為 `lerobot.zip`，且位於 `~/Downloads`。如果瀏覽器使用了不同檔名，請自行替換指令中的檔名。
 
 ```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL> lerobot
-cd lerobot
+# 安裝解壓縮工具
+sudo apt update
+sudo apt install -y unzip
+
+# 建立專案放置位置
+mkdir -p "$HOME/project_ws/src"
+
+# 解壓縮從 OneDrive 下載的完整專案
+unzip "$HOME/Downloads/lerobot.zip" -d "$HOME/project_ws/src"
+
+# 確認解壓縮結果；應能找到專案根目錄的 pyproject.toml
+find "$HOME/project_ws/src" -maxdepth 3 -type f -name pyproject.toml -print
 ```
 
-### 2. 建立 Conda 環境
+若解壓縮後的資料夾名稱就是 `lerobot`，進入專案的指令為：
+
+```bash
+cd "$HOME/project_ws/src/lerobot"
+ls -lah
+test -f pyproject.toml && echo "找到 LeRobot 專案根目錄"
+```
+
+如果壓縮檔解開後還有一層資料夾，請進入前一步 `find` 所顯示、包含專案根目錄 `pyproject.toml` 的目錄。後續的 `python -m pip install -e .` 必須在該目錄執行。
+
+### 2. 安裝完整專案
+
+先建立 Python 3.10 Conda 環境及系統工具：
 
 ```bash
 conda create -y -n lerobot python=3.10
@@ -135,11 +162,19 @@ conda activate lerobot
 conda install -y ffmpeg=7.1.1 -c conda-forge
 
 sudo apt update
-sudo apt install -y v4l-utils rsync build-essential
+sudo apt install -y v4l-utils rsync build-essential unzip
 
 python -m pip install --upgrade pip
+```
+
+接著進入剛才從雲端解壓縮的專案根目錄，以 editable mode 安裝完整專案及其 Python 相依套件：
+
+```bash
+cd "$HOME/project_ws/src/lerobot"
 python -m pip install -e .
 ```
+
+安裝成功後，無論從哪個工作目錄執行 Python，都會載入這個資料夾內的 LeRobot 程式；修改原始碼後通常不需要重新複製或重新安裝。
 
 由於 `rclpy` 與 `tm_msgs` 來自 ROS 2／TM Driver workspace，而非一般 PyPI 套件，每次開啟新終端機時還需要載入 ROS 環境：
 
@@ -147,19 +182,22 @@ python -m pip install -e .
 source /opt/ros/humble/setup.bash
 source <TM_ROS2_WORKSPACE>/install/setup.bash
 conda activate lerobot
-cd ~/lerobot
+cd "$HOME/project_ws/src/lerobot"
 ```
 
 若 Conda 中的 Python 無法載入系統 ROS 2 Python 套件，請確認 Python 版本與 ROS 2 Humble 相容，並檢查 `PYTHONPATH`。不要用來源不明的 `pip install rclpy` 取代完整 ROS 2 安裝。
 
-### 3. 驗證安裝
+### 3. 驗證專案安裝
 
 ```bash
 python -c "import lerobot; print('LeRobot import OK')"
 python -c "import rclpy; from tm_msgs.srv import SendScript; print('ROS 2 / tm_msgs import OK')"
+python -m pip show lerobot
 which ffmpeg
 v4l2-ctl --version
 ```
+
+`python -m pip show lerobot` 的 `Editable project location` 應指向剛才解壓縮的 `$HOME/project_ws/src/lerobot`。若不是，代表目前環境載入了其他 LeRobot 版本，請先移除衝突版本，再回到專案根目錄重新執行 `python -m pip install -e .`。
 
 ## 啟動 TM ROS 2 Driver
 
@@ -196,7 +234,7 @@ v4l2-ctl --list-devices
 
 請記錄前視與側視相機對應的 `/dev/video*`。重新插拔 USB 或重新開機後編號可能改變；正式實驗建議建立固定的 udev symlink，避免裝置順序變動。
 
-### 2. 預覽雙相機
+### 2. 預覽雙相機(路經需照實際電腦做修改)
 
 先修改 `camera2.py` 中的 `CAM0_INDEX` 與 `CAM8_INDEX`，再執行：
 
@@ -243,7 +281,7 @@ v4l2-ctl -d /dev/video8 --get-parm
 source /opt/ros/humble/setup.bash
 source <TM_ROS2_WORKSPACE>/install/setup.bash
 conda activate lerobot
-cd ~/lerobot
+cd "$HOME/project_ws/src/lerobot"
 ```
 
 ### 2. 鍵盤控制
@@ -385,7 +423,7 @@ ls -lah "$HOME/datasets/tm_lerobot_datasets/meta/stats.json"
 
 ```bash
 conda activate lerobot
-cd ~/lerobot
+cd "$HOME/project_ws/src/lerobot"
 
 lerobot-train \
   --dataset.root="$HOME/datasets/tm_lerobot_datasets" \
@@ -423,7 +461,7 @@ lerobot-train \
 
 `chunk_size=200`、`n_action_steps=200` 與 `steps=140000` 是本實驗的起始設定，不保證適合所有任務。10 FPS 下 200 steps 約對應 20 秒動作區段；若任務需要頻繁根據新影像修正，可測試較短 action horizon。請比較 validation loss 與真機成功率，不要只選最後一個 checkpoint。
 
-### 4. 將模型複製回 Windows
+### 4. 將模型複製回 Windows(路經需照實際電腦做修改)
 
 依終端機實際輸出修改時間戳：
 
@@ -451,13 +489,13 @@ ls -lah "$WIN_DST"
 4. 確保相機名稱、順序、解析度、FPS、場景視角及 task text 與訓練時一致。
 5. 先將 TMflow 速度設低，確認急停可立即介入。
 
-### 2. 執行 ACT policy
+### 2. 執行 ACT policy(路經需照實際電腦做修改)
 
 ```bash
 source /opt/ros/humble/setup.bash
 source <TM_ROS2_WORKSPACE>/install/setup.bash
 conda activate lerobot
-cd ~/lerobot
+cd "$HOME/project_ws/src/lerobot"
 
 POLICY_DIR="/home/juze/lerobot/act_tm_lerobot_datasets_20260621_135115/checkpoints/100000/pretrained_model"
 DATASET_ROOT="$HOME/tm_lerobot_eval"
@@ -490,13 +528,7 @@ python -m lerobot.scripts.lerobot_record_tm \
 
 ### 3. 計算成功率
 
-`lerobot_record_tm.py` 會輸出評估 episode，但不會自動判定任務成功。請先定義可重複的成功條件，例如「物件在 episode 結束前完整放入指定區域且未掉落」，再逐回合標記：
-
-```text
-成功率 = 成功 episode 數 / 總評估 episode 數 × 100%
-```
-
-除了成功率，建議同時記錄失敗類型、完成時間、碰撞／急停次數、物件起始位置及使用的 checkpoint。推論資料可以用來分析，但若要加入下一輪訓練，應先人工篩選；不要把失敗或人為中止的軌跡直接混入示範資料。
+`lerobot_record_tm.py` 會輸出評估 episode，但不會自動判定任務成功。
 
 ## 修改 state、action 或擴充其他手臂
 
@@ -574,7 +606,3 @@ ros2 service list | grep send_script
 - [LeRobot 文件](https://huggingface.co/docs/lerobot/index)
 - [Seeed Studio：SO-ARM100／SO-ARM101 LeRobot 教學](https://wiki.seeedstudio.com/cn/lerobot_so100m/)
 - [Techman Robot 官方 ROS 2 Driver](https://github.com/TechmanRobotInc/tmr_ros2/tree/humble)
-
-## 授權與聲明
-
-請依本 repository 及其上游 LeRobot、Techman Robot driver 和各第三方套件的授權條款使用。本專案為研究與實驗整合，並不取代 TM5-900、TMflow、ROS 2 Driver 或末端工具的官方操作與安全文件。
