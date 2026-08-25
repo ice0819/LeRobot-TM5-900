@@ -1,0 +1,114 @@
+
+
+
+切換conda環境
+conda activate lerobot
+cd ~/lerobot
+
+
+
+
+
+連上手臂
+ros2 run tm_driver tm_driver robot_ip:=192.168.250.40
+ros2 run tm_driver tm_driver robot_ip:=192.168.10.3
+
+
+
+
+
+測試相機
+v4l2-ctl --list-devices
+
+PYTHONNOUSERSITE=1 /home/omda/miniconda3/envs/lerobot/bin/python /home/omda/project_ws/src/lerobot/camera2.py
+
+v4l2-ctl -d /dev/video6 --set-fmt-video=width=1280,height=720,pixelformat=MJPG
+v4l2-ctl -d /dev/video6 --set-parm=10
+
+v4l2-ctl -d /dev/video8 --set-fmt-video=width=1280,height=720,pixelformat=MJPG
+v4l2-ctl -d /dev/video8 --set-parm=10
+
+
+訓練資料收集
+#teleoperate keyboard_xyz
+
+DATASET_ROOT="$HOME/tm_lerobot_datasets"
+DATASET_ID="local/tm_2cam_test"
+rm -rf "$DATASET_ROOT"
+/home/omda/miniconda3/envs/lerobot/bin/python -m lerobot.scripts.lerobot_record_tm \
+  --robot.type=tm_follower \
+  --teleop.type=keyboard_xyz \
+  --robot.cameras="{ front: {type: opencv, index_or_path: /dev/video0, width: 1280, height: 720, fps: 10, fourcc: \"MJPG\", warmup_s: 5}, side: {type: opencv, index_or_path: /dev/video2, width: 1280, height: 720, fps: 10, fourcc: \"MJPG\", warmup_s: 5}}" \
+  --display_data=false \
+  --dataset.repo_id="$DATASET_ID" \
+  --dataset.num_episodes=15 \
+  --dataset.single_task="TM test move" \
+  --dataset.root="$DATASET_ROOT" \
+  --dataset.push_to_hub=false \
+  --dataset.fps=10 \
+  --dataset.episode_time_s=600 \
+  --dataset.reset_time_s=5
+
+
+繼續錄製
+DATASET_ROOT="$HOME/tm_lerobot_datasets"
+DATASET_ID="local/tm_2cam_test"
+/home/omda/miniconda3/envs/lerobot/bin/python -m lerobot.scripts.lerobot_record_tm \
+  --robot.type=tm_follower \
+  --teleop.type=keyboard_xyz \
+  --robot.cameras="{ front: {type: opencv, index_or_path: /dev/video6, width: 1280, height: 720, fps: 10, fourcc: \"MJPG\", warmup_s: 5}, side: {type: opencv, index_or_path: /dev/video8, width: 1280, height: 720, fps: 10, fourcc: \"MJPG\", warmup_s: 5}}" \
+  --display_data=false \
+  --dataset.repo_id="$DATASET_ID" \
+  --dataset.num_episodes=7 \
+  --dataset.single_task="TM test move" \
+  --dataset.root="$DATASET_ROOT" \
+  --dataset.push_to_hub=false \
+  --dataset.fps=10 \
+  --dataset.episode_time_s=600 \
+  --dataset.reset_time_s=5 \
+  --resume=true
+
+
+
+推論
+#run policy
+
+POLICY_PATH="//home/omda/project_ws/src/lerobot/100/checkpoints/100000/pretrained_model"
+/home/omda/miniconda3/envs/lerobot/bin/python -m lerobot.scripts.lerobot_record_tm \
+  --robot.type=tm_follower \
+  --teleop.type=keyboard_xyz \
+  --robot.cameras="{ front: {type: opencv, index_or_path: /dev/video0, width: 1280, height: 720, fps: 10, fourcc: \"MJPG\", warmup_s: 5}, side: {type: opencv, index_or_path: /dev/video2, width: 1280, height: 720, fps: 10, fourcc: \"MJPG\", warmup_s: 5}}" \
+  --display_data=false \
+  --dataset.repo_id="local/eval_tm_2cam_test" \
+  --dataset.num_episodes=3 \
+  --dataset.single_task="TM test move" \
+  --dataset.root="$HOME/TM_eval_$(date +%H%M%S)" \
+  --dataset.push_to_hub=false \
+  --dataset.fps=10 \
+  --dataset.episode_time_s=5000 \
+  --dataset.reset_time_s=1 \
+  --policy.path="$POLICY_PATH" \
+  --policy.device=cuda
+
+
+
+POLICY_DIR="/home/juze/lerobot/act_tm_lerobot_datasets_20260621_135115/checkpoints/100000/pretrained_model"
+DATASET_ROOT="$HOME/tm_lerobot_eval"
+DATASET_ID="local/eval_tm_2cam_act"
+/home/omda/miniconda3/envs/lerobot/bin/python -m lerobot.scripts.lerobot_record_tm \
+python -m lerobot.scripts.lerobot_record_tm \
+  --robot.type=tm_follower \
+  --robot.cameras="{ front: {type: opencv, index_or_path: /dev/video0, width: 1280, height: 720, fps: 10, fourcc: \"MJPG\", warmup_s: 5}, side: {type: opencv, index_or_path: /dev/video8, width: 1280, height: 720, fps: 10, fourcc: \"MJPG\", warmup_s: 5}}" \
+  --display_data=false \
+  --dataset.repo_id="$DATASET_ID" \
+  --dataset.num_episodes=5 \
+  --dataset.single_task="TM test move" \
+  --dataset.root="$DATASET_ROOT" \
+  --dataset.push_to_hub=false \
+  --dataset.fps=10 \
+  --dataset.episode_time_s=600 \
+  --dataset.reset_time_s=15 \
+  --policy.type=act \
+  --policy.pretrained_path="$POLICY_DIR" \
+  --policy.device=cuda \
+  --policy.use_amp=true

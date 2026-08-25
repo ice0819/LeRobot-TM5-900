@@ -1,0 +1,47 @@
+
+
+切換conda環境
+conda activate lerobot
+
+
+
+新的資料集遷移到WSL中訓練
+SRC="/mnt/c/Users/Administrator/Desktop/tm_lerobot_datasets"
+DST="$HOME/datasets/tm_lerobot_datasets"
+mkdir -p "$DST"
+rsync -ah --delete --info=progress2 "$SRC"/ "$DST"/
+
+
+ls -lah "$HOME/datasets/tm_lerobot_datasets/meta/info.json"
+ls -lah "$HOME/datasets/tm_lerobot_datasets/meta/stats.json"
+
+
+
+用 WSL 路徑開訓練
+lerobot-train \
+  --dataset.root="$HOME/datasets/tm_lerobot_datasets" \
+  --dataset.repo_id="local/tm_lerobot_datasets" \
+  --policy.type=act \
+  --policy.repo_id="local/act_tm_lerobot_datasets" \
+  --policy.device=cuda \
+  --policy.use_amp=true \
+  --policy.push_to_hub=false \
+  --policy.chunk_size=200 \
+  --policy.n_action_steps=200 \
+  --output_dir="$HOME/lerobot_outputs/train/act_tm_lerobot_datasets_$(date +%Y%m%d_%H%M%S)" \
+  --job_name="act_tm_lerobot_datasets" \
+  --wandb.enable=true \
+  --wandb.disable_artifact=true \
+  --steps=140000 \
+  --save_freq=20000
+
+
+訓練後結果搬過來
+OUT="/home/juze/lerobot_outputs/train/act_tm_lerobot_datasets_20260704_113746"
+WIN_DST="/mnt/c/Users/Administrator/Desktop/act_tm_lerobot_datasets_20260704_113746"
+
+mkdir -p "$WIN_DST"
+rsync -ah --info=progress2 "$OUT"/ "$WIN_DST"/
+sync
+du -sh "$OUT" "$WIN_DST"
+ls -lah "$WIN_DST"
